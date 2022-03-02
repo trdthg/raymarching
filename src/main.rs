@@ -10,12 +10,13 @@ use vec3::Vec3;
 
 lazy_static! {
     static ref PIXELS: Vec<char> = " .:+|0#".chars().collect();
+    static ref T: f64 = 0.0;
 }
 const WEIGHT: u32 = 80;
 const HEIGHT: u32 = 40;
 
 // 模拟光线行进
-pub fn raymarch(framebuffer: &mut Vec<Vec<char>>) {
+pub fn raymarch(framebuffer: &mut Vec<Vec<char>>, t: f64) {
     let mut pxl = PIXELS.get(1).unwrap().to_owned();
     // 光线从一个像素点射出
     for y in 0..HEIGHT {
@@ -44,7 +45,7 @@ pub fn raymarch(framebuffer: &mut Vec<Vec<char>>) {
                 // 计算光线距离最近物体的距离
                 let dist = sdf(&pos);
                 if dist < 1e-6 {
-                    pxl = shade(&pos);
+                    pxl = shade(&pos, t);
                     break;
                 }
                 pos = pos.add(&ray.multiply(dist));
@@ -60,16 +61,16 @@ pub fn sdf(pos: &Vec3) -> f64 {
     pos.subtrate(&center).length() - 0.2
 }
 
-pub fn shade(pos: &Vec3) -> char {
+pub fn shade(pos: &Vec3, t: f64) -> char {
     // 随时间变换位置的光源
-    let t = chrono::Local::now().timestamp() as f64;
 
-    let mut l = Vec3::new(50.0 * t.sin(), 20.0, 50.0 * t.sin());
+    let mut l = Vec3::new(50.0 * t.sin(), 0.0, 50.0 * t.cos());
     l.normalize();
 
-    //
+    // pos是光线距离切面距离最近的点
     let dt = 1e-6;
     let current_val = sdf(pos);
+    // 向外平移
     let x = Vec3::new(pos.x + dt, pos.y, pos.z);
     let y = Vec3::new(pos.x, pos.y + dt, pos.z);
     let z = Vec3::new(pos.x, pos.y, pos.z + dt);
@@ -103,10 +104,21 @@ fn printfb(framebuffer: &Vec<Vec<char>>) {
 
 fn main() {
     let mut framebuffer = vec![vec![' '; WEIGHT as usize]; HEIGHT as usize];
+    let mut s = chrono::Local::now().timestamp_millis() as f64;
     loop {
-        thread::sleep(Duration::from_millis(2));
+        let mut t = chrono::Local::now().timestamp_millis() as f64;
+        loop {
+            if (chrono::Local::now().timestamp_millis() as f64 - t) / 1000.0 >= 1.0 / 60.0 {
+                t = chrono::Local::now().timestamp_millis() as f64;
+                break;
+            }
+        }
         clear_screen();
-        raymarch(&mut framebuffer);
+        raymarch(
+            &mut framebuffer,
+            (chrono::Local::now().timestamp_millis() as f64 - s) * 1e-6,
+        );
         printfb(&framebuffer);
+        // break;
     }
 }
